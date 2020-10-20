@@ -2,6 +2,8 @@ import cv2
 import argparse
 import numpy as np
 from pysinewave import SineWave
+import time
+
 
 class Detection(object):
  
@@ -15,7 +17,12 @@ class Detection(object):
         current_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         delta = cv2.absdiff(self.previous_gray, current_gray)
         threshold_image = cv2.threshold(delta, 25, 255, cv2.THRESH_BINARY)[1]
- 
+        
+        cv2.imshow("Standard frame", image)
+        cv2.imshow("Gray-scaled", current_gray)
+        #cv2.imshow("Threshold", threshold_image)
+        
+        cv2.waitKey(1)
  
         # store current image
         self.previous_gray = current_gray
@@ -26,45 +33,78 @@ class Detection(object):
  
         # store motion level for each cell
         cells = np.array([0, 0, 0, 0, 0, 0, 0])
-        cells[0] = cv2.countNonZero(threshold_image[0:200, 0:cell_width])
-        cells[1] = cv2.countNonZero(threshold_image[0:200, cell_width:cell_width*2])
-        cells[2] = cv2.countNonZero(threshold_image[0:200, cell_width*2:cell_width*3])
-        cells[3] = cv2.countNonZero(threshold_image[0:200, cell_width*3:cell_width*4])
-        cells[4] = cv2.countNonZero(threshold_image[0:200, cell_width*4:cell_width*5])
-        cells[5] = cv2.countNonZero(threshold_image[0:200, cell_width*5:cell_width*6])
-        cells[6] = cv2.countNonZero(threshold_image[0:200, cell_width*6:width])
-        #print(cells[0], " | ", cells[1], " | ", cells[2], " | ", cells[3], " | ", cells[4], " | ", cells[4], " | ", cells[5], " | ", cells[6], " | ")
+        cells[0] = cv2.countNonZero(threshold_image[0:200, 50:125])
+        cells[1] = cv2.countNonZero(threshold_image[0:200, 125:200])
+        cells[2] = cv2.countNonZero(threshold_image[0:200, 200:275])
+        cells[3] = cv2.countNonZero(threshold_image[0:200, 275:350])
+        cells[4] = cv2.countNonZero(threshold_image[0:200, 350:425])
+        cells[5] = cv2.countNonZero(threshold_image[0:200, 425:500])
+        cells[6] = cv2.countNonZero(threshold_image[0:200, 500:575])
+        print(cells[0], " | ", cells[1], " | ", cells[2], " | ", cells[3], " | ", cells[4], " | ", cells[4], " | ", cells[5], " | ", cells[6], " | ")
         top_cell =  np.argmax(cells)
- 
+
+
         # return the most active cell, if threshold met
         if(cells[top_cell] >= self.THRESHOLD):
-            print("play: ",top_cell)
+            #print("play: ",top_cell)
             return top_cell
         else:
             return None
 
+class main(object):
+    def __init__(self):
+        self.capture = cv2.VideoCapture(0)
+        ret, frame = self.capture.read()
+        self.detect = Detection(frame)
+        self.sinewave = SineWave(pitch = int(0), pitch_per_second = int(1000), decibels=int(1))
+    
 
-kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (1, 3))
+    def draw_rectangles(self, frame):
+        for x in range(0,7):
+            cv2.rectangle(frame, (50+(x*75), 0), (50+(x*75+75),200), (255,255,255), 5)
+        return frame
 
 
+    def start(self):
+        while True:
+            self.ret, self.frame = self.capture.read()
+            self.frame = self.draw_rectangles(self.frame)
+            self.frame = cv2.flip(self.frame, 1)
+
+            keyCheck = self.detect.get_active_cell(self.frame)
+            
+
+            if keyCheck == 0: self.sinewave.set_frequency(261.63)
+            elif keyCheck == 1: self.sinewave.set_frequency(293.66)
+            elif keyCheck == 2: self.sinewave.set_frequency(329.63)
+            elif keyCheck == 3: self.sinewave.set_frequency(349.23)
+            elif keyCheck == 4: self.sinewave.set_frequency(392)
+            elif keyCheck == 5: self.sinewave.set_frequency(440.9)
+            elif keyCheck == 6: self.sinewave.set_frequency(493.88)
+            if keyCheck or keyCheck == 0: self.sinewave.play()
+            
+
+main = main()
+
+main.start()
+
+
+
+
+
+"""
 backSub = cv2.createBackgroundSubtractorMOG2(detectShadows=False)
-#capture = cv.VideoCapture("randomimg.png") 
+
 capture = cv2.VideoCapture(0) 
-ret, frame = capture.read()
-detect = Detection(frame)
 
-
-sinewave = SineWave(pitch = int(0), pitch_per_second = int(1000))
-sinewave.set_volume(100)
 while True:
     ret, frame = capture.read()
     if frame is None:
         break
+
     frame = cv2.flip(frame, 1)
     
     fgMask = backSub.apply(frame, 0)
-    
-    fgMask = cv2.morphologyEx(fgMask, cv2.MORPH_OPEN, kernel)
 
     fgMask = cv2.medianBlur(fgMask, 5)
 
@@ -72,39 +112,21 @@ while True:
 
     for x in range(0,7):
         cv2.rectangle(frame, (50+(x*75), 0), (50+(x*75+75),200), (0,255,0), 4)
+    
 
-    checkForKey = detect.get_active_cell(frame)
-    if checkForKey == 0:
-        sinewave.set_frequency(261.63)
-    elif checkForKey == 1:
-        sinewave.set_frequency(293.66)
-    elif checkForKey == 2:
-        sinewave.set_frequency(329.63)
-    elif checkForKey == 3:
-        sinewave.set_frequency(349.23)
-    elif checkForKey == 4:
-        sinewave.set_frequency(392)
-    elif checkForKey == 5:
-        sinewave.set_frequency(440.9)
-    elif checkForKey == 6:
-        sinewave.set_frequency(493.88)
-    sinewave.play()
+    for c in contours:
+        if cv2.contourArea(c) < 500:
+            continue
 
-#    for c in contours:
-#        if cv2.contourArea(c) < 500:
-#            continue
-#
-#        x,y,w,h = cv2.boundingRect(c)
-#
-#        cv2.rectangle(frame, (x,y), (x + w, y + h), (255,0,0), 2)
+        x,y,w,h = cv2.boundingRect(c)
+
+        cv2.rectangle(frame, (x,y), (x + w, y + h), (255,0,0), 2)
    
     cv2.imshow('Frame', frame)
-    cv2.imshow('FG Mask', fgMask)
     
     keyboard = cv2.waitKey(1)
     if keyboard == 'q' or keyboard == 27:
         break
-
 
 
 
